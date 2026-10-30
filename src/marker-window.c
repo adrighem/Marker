@@ -148,6 +148,25 @@ show_unsaved_documents_warning_async (MarkerWindow           *window,
 }
 
 static void
+on_fullscreen_notify (GtkWindow   *gtk_window,
+                      GParamSpec  *pspec,
+                      gpointer     user_data)
+{
+  MarkerWindow *window = MARKER_WINDOW (gtk_window);
+  gboolean fullscreen = gtk_window_is_fullscreen (gtk_window);
+  GAction *action =
+    g_action_map_lookup_action (G_ACTION_MAP (window), "fullscreen");
+
+  if (G_IS_SIMPLE_ACTION (action))
+    g_simple_action_set_state (G_SIMPLE_ACTION (action),
+                               g_variant_new_boolean (fullscreen));
+
+  if (window->unfullscreen_btn)
+    gtk_widget_set_visible (GTK_WIDGET (window->unfullscreen_btn),
+                            fullscreen);
+}
+
+static void
 action_fullscreen (GSimpleAction *action,
                    GVariant      *value,
                    gpointer       window)
@@ -1072,6 +1091,9 @@ marker_window_init (MarkerWindow *window)
     g_signal_connect (G_SIMPLE_ACTION (action), "change-state", G_CALLBACK (action_fullscreen), window);
     const gchar *fullscreen_accels[] = { "F11", NULL };
     gtk_application_set_accels_for_action (app, "win.fullscreen", fullscreen_accels);
+
+    g_signal_connect (window, "notify::fullscreened",
+                      G_CALLBACK (on_fullscreen_notify), NULL);
     g_action_map_add_action (G_ACTION_MAP (window), action);
 
     action = G_ACTION (g_simple_action_new_stateful ("sidebar", NULL, g_variant_new_boolean (FALSE)));
@@ -1100,6 +1122,7 @@ marker_window_init (MarkerWindow *window)
   adw_application_window_set_content (ADW_APPLICATION_WINDOW (window), GTK_WIDGET (vbox));
 
   /** HeaderBar **/
+  gtk_builder_add_from_resource (builder, "/com/github/adrighem/marker/ui/marker-gear-popover.ui", NULL);
   gtk_builder_add_from_resource (builder, "/com/github/adrighem/marker/ui/marker-headerbar.ui", NULL);
   AdwHeaderBar *header_bar = ADW_HEADER_BAR (gtk_builder_get_object (builder, "header_bar"));
   window->header_bar = header_bar;
@@ -1114,7 +1137,6 @@ marker_window_init (MarkerWindow *window)
   }
 
   /** Popover / Gear Menu **/
-  gtk_builder_add_from_resource (builder, "/com/github/adrighem/marker/ui/marker-gear-popover.ui", NULL);
   window->zoom_original_btn = GTK_BUTTON (gtk_builder_get_object (builder, "zoom_original_btn"));
 
   /** Main View **/
@@ -1568,7 +1590,7 @@ marker_window_toggle_fullscreen (MarkerWindow *window)
 gboolean
 marker_window_is_fullscreen (MarkerWindow *window)
 {
-  return window->is_fullscreen;
+  return gtk_window_is_fullscreen (GTK_WINDOW (window));
 }
 
 MarkerEditor *
