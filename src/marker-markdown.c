@@ -468,8 +468,9 @@ neutralize_pua_placeholders (char *buf, size_t size)
 /*
  * Rewrites "- [ ]" / "- [x]" (and ordered variants) list-item markers
  * into U+E000/U+E001 placeholders. Returns NULL when the document
- * contains no task-list item, so the original buffer can be rendered
- * as-is. Content of fenced code blocks is left untouched.
+ * contains neither a task-list item nor a stray U+E000/U+E001, so the
+ * original buffer can be rendered as-is. Content of fenced code blocks
+ * is left untouched.
  */
 static gchar*
 preprocess_task_lists (const char *markdown, size_t size)
@@ -488,7 +489,10 @@ preprocess_task_lists (const char *markdown, size_t size)
    * so byte offsets (and the scidown cursor position) stay valid. */
   if (contains_pua_placeholder (markdown, size))
   {
-    scratch = g_memdup2 (markdown, size);
+    /* NUL-terminated: may be returned as-is (callers use strlen()). */
+    scratch = g_malloc (size + 1);
+    memcpy (scratch, markdown, size);
+    scratch[size] = '\0';
     neutralize_pua_placeholders (scratch, size);
     scan_text = scratch;
     copied = scratch;
@@ -507,8 +511,10 @@ preprocess_task_lists (const char *markdown, size_t size)
     copied = marker + 3;
   }
 
+  /* No task items: still render the neutralized copy if there is one,
+   * otherwise stray U+E000/U+E001 would become ghost checkboxes. */
   if (!out)
-    return NULL;
+    return g_steal_pointer (&scratch);
 
   g_string_append_len (out, copied, (gssize) ((scan_text + size) - copied));
   return g_string_free (out, FALSE);

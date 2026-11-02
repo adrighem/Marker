@@ -285,8 +285,10 @@ marker_editor_key_pressed_cb (GtkEventControllerKey *controller,
   /* Undo/redo are bound to the source view only; when the preview holds
    * keyboard focus (e.g. right after clicking a task-list checkbox), the
    * shortcuts never fire. Forward them to the buffer instead.
-   * gtk_text_buffer_undo/redo: GTK >= 4.16. */
-  if ((state & GDK_CONTROL_MASK) &&
+   * Only plain Ctrl or Ctrl+Shift: leave Ctrl+Alt+Z etc. to others. */
+  const GdkModifierType mods =
+    state & gtk_accelerator_get_default_mod_mask () & ~GDK_SHIFT_MASK;
+  if (mods == GDK_CONTROL_MASK &&
       (keyval == GDK_KEY_z || keyval == GDK_KEY_Z ||
        keyval == GDK_KEY_y || keyval == GDK_KEY_Y))
   {
