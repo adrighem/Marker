@@ -19,6 +19,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y appstream desktop-file-utils libglib2.0-bin
 
+      - name: Test release scripts
+        run: |
+          python3 -m unittest discover -s .github/scripts -v
+
       - name: Validate AppStream Metadata
         run: |
           appstreamcli validate --no-net --explain data/com.github.adrighem.marker.appdata.xml
