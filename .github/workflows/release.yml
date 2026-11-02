@@ -5,6 +5,9 @@ on:
     branches:
       - master
       - main
+  schedule:
+    # Refresh an open release PR so its version follows the new month.
+    - cron: '17 3 1 * *'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -31,6 +34,8 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # The release PR is opened by the CLI below with a calendar version.
+          skip-github-pull-request: true
       - name: Extract release metadata
         id: release-meta
         if: ${{ steps.release.outputs.releases_created == 'true' || steps.release.outputs.release_created == 'true' }}
@@ -72,6 +77,66 @@ jobs:
           echo "version=${ver}" >> "$GITHUB_OUTPUT"
           echo "sha=${release_sha}" >> "$GITHUB_OUTPUT"
           echo "releases_created=true" >> "$GITHUB_OUTPUT"
+
+  # Calendar versioning (YYYY.M.PATCH): release-please only knows SemVer
+  # bumps, so the next version is computed here and forced via --release-as.
+  release-pr:
+    needs: release-please
+    if: github.event_name != 'workflow_dispatch' || inputs.release_tag == ''
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-pr-${{ github.ref_name }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      PR_BRANCH: release-please--branches--${{ github.ref_name }}--components--marker
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Compute calendar version
+        id: calver
+        run: |
+          last=$(jq -r '."."' .release-please-manifest.json)
+          now=$(date -u +%Y.%-m)
+          if [ "${last%.*}" = "$now" ]; then
+            next="${now}.$(( ${last##*.} + 1 ))"
+          else
+            next="${now}.0"
+          fi
+          echo "Last release ${last}, next ${next}"
+          echo "next=${next}" >> "$GITHUB_OUTPUT"
+      - name: Open or update release PR
+        env:
+          NEXT_VERSION: ${{ steps.calver.outputs.next }}
+        run: |
+          npx --yes release-please@17.11.2 release-pr \
+            --token "$GITHUB_TOKEN" \
+            --repo-url "$GITHUB_REPOSITORY" \
+            --target-branch "$GITHUB_REF_NAME" \
+            --config-file release-please-config.json \
+            --manifest-file .release-please-manifest.json \
+            --release-as "$NEXT_VERSION"
+      - name: Add AppStream release entry to release PR
+        run: |
+          if ! git ls-remote --exit-code --heads origin "$PR_BRANCH" >/dev/null; then
+            echo "No release PR branch, nothing to do"
+            exit 0
+          fi
+          cp .github/scripts/appdata_release.py "$RUNNER_TEMP/"
+          git fetch --depth 1 origin "$PR_BRANCH"
+          git checkout -B "$PR_BRANCH" FETCH_HEAD
+          version=$(jq -r '."."' .release-please-manifest.json)
+          python3 -I "$RUNNER_TEMP/appdata_release.py" \
+            data/com.github.adrighem.marker.appdata.xml CHANGELOG.md \
+            "$version" "$(date -u +%Y-%m-%d)"
+          if git diff --quiet; then
+            echo "AppStream entry for ${version} up to date"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "chore: add AppStream release entry for ${version}"
+          git push origin "HEAD:refs/heads/${PR_BRANCH}"
 
   build-deb:
     needs: release-please
