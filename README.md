@@ -64,7 +64,7 @@ flatpak-builder --run build-flatpak com.github.adrighem.marker.json marker
 
 Marker uses calendar versioning: `YYYY.M.PATCH` (for example `2026.11.1`). The first release in a month gets patch `0`; later releases that month bump the patch number.
 
-Releases are automated with [release-please](https://github.com/googleapis/release-please). Merging conventional commits to `master` opens or updates a release PR; the release workflow computes the calendar version, and also adds the AppStream release notes to `data/com.github.adrighem.marker.appdata.xml` from `CHANGELOG.md`. Merging the release PR tags the release and builds the Debian, Ubuntu and Fedora packages.
+Releases are automated with [release-please](https://github.com/googleapis/release-please). Merging conventional commits to `master` opens or updates a release PR; the release workflow computes the calendar version, credits external contributors (`(@login)`) in the changelog and release notes, and adds the AppStream release notes to `data/com.github.adrighem.marker.appdata.xml` from `CHANGELOG.md`. Merging the release PR tags the release and builds the Debian, Ubuntu and Fedora packages.
 
 ---
 

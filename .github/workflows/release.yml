@@ -88,6 +88,7 @@ jobs:
       group: release-pr-${{ github.ref_name }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
       PR_BRANCH: release-please--branches--${{ github.ref_name }}--components--marker
     steps:
       - uses: actions/checkout@v4
@@ -116,26 +117,40 @@ jobs:
             --config-file release-please-config.json \
             --manifest-file .release-please-manifest.json \
             --release-as "$NEXT_VERSION"
-      - name: Add AppStream release entry to release PR
+      - name: Credit contributors and add AppStream entry to release PR
+        env:
+          OWNER: ${{ github.repository_owner }}
         run: |
-          if ! git ls-remote --exit-code --heads origin "$PR_BRANCH" >/dev/null; then
-            echo "No release PR branch, nothing to do"
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$PR_BRANCH" \
+            --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            echo "No open release PR, nothing to do"
             exit 0
           fi
-          cp .github/scripts/appdata_release.py "$RUNNER_TEMP/"
+          scripts="$RUNNER_TEMP/scripts"
+          cp -r .github/scripts "$scripts"
+          # The PR body becomes the GitHub release notes on merge.
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq .body > "$RUNNER_TEMP/body.md"
+          cp "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/body.orig.md"
+          python3 -I "$scripts/credit_authors.py" "$RUNNER_TEMP/body.md" "$GITHUB_REPOSITORY" "$OWNER"
+          if ! cmp -s "$RUNNER_TEMP/body.md" "$RUNNER_TEMP/body.orig.md"; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/pulls/${pr}" \
+              -F "body=@$RUNNER_TEMP/body.md" --silent
+          fi
           git fetch --depth 1 origin "$PR_BRANCH"
           git checkout -B "$PR_BRANCH" FETCH_HEAD
           version=$(jq -r '."."' .release-please-manifest.json)
-          python3 -I "$RUNNER_TEMP/appdata_release.py" \
+          python3 -I "$scripts/credit_authors.py" CHANGELOG.md "$GITHUB_REPOSITORY" "$OWNER"
+          python3 -I "$scripts/appdata_release.py" \
             data/com.github.adrighem.marker.appdata.xml CHANGELOG.md \
             "$version" "$(date -u +%Y-%m-%d)"
           if git diff --quiet; then
-            echo "AppStream entry for ${version} up to date"
+            echo "Release PR for ${version} up to date"
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -am "chore: add AppStream release entry for ${version}"
+          git commit -am "chore: credit contributors and add AppStream entry for ${version}"
           git push origin "HEAD:refs/heads/${PR_BRANCH}"
 
   build-deb:
