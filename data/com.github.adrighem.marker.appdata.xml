@@ -44,6 +44,18 @@
   </provides>
 
   <releases>
+    <release version="2026.11.1" date="2026-11-02">
+      <description translate="no">
+        <ul>
+          <li>Render GFM task lists as interactive checkboxes in the preview.</li>
+          <li>Polish find bar, zoom synchronization, custom stylesheets, and image reload.</li>
+          <li>Harden preview security, atomic undo, posix newline, safe rename and headless export.</li>
+          <li>Keep cursor position on file reload, drop redundant fullscreen state.</li>
+          <li>Resolve GTK4 port regressions in view mode, menus, preview and fullscreen.</li>
+          <li>Task list follow-ups from #4 review.</li>
+        </ul>
+      </description>
+    </release>
     <release version="2026.10.0" date="2026-10-11">
       <description translate="no">
         <ul>

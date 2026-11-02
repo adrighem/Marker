@@ -1,5 +1,5 @@
 # x-release-please-start-version
-%{!?marker_version:%global marker_version 2026.11.0}
+%{!?marker_version:%global marker_version 2026.11.1}
 # x-release-please-end
 
 Name:           marker

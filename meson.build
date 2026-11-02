@@ -1,7 +1,7 @@
 project(
   'marker',
   'c',
-  version: '2026.11.0', # x-release-please-version
+  version: '2026.11.1', # x-release-please-version
   meson_version: '>= 0.62.0',
   default_options: [
     'warning_level=2',
